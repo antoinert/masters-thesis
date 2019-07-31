@@ -34,12 +34,15 @@ def create_master_table(folder):
     print("Number of lines: {}".format(len(master_table)))
     master_table.to_csv('./{}/master_table.csv'.format(folder))
 
-
 def preprocess_df(master_table):
+    master_table = master_table.sort_values(by=['smartly_company_id', 'date_1'])
     master_table = remove_unnecessary_columns(master_table)
-    master_table = normalize_occasional_columns(master_table)
     master_table = master_table.groupby('smartly_company_id').filter(lambda df: no_pure_churn_data(df))
+    master_table = master_table.groupby('smartly_company_id').apply(remove_after_churn)
+    master_table = normalize_occasional_columns(master_table)
     master_table = master_table.fillna(0)
+    master_table = master_table.set_index('smartly_company_id')
+
     return master_table
 
 def no_pure_churn_data(df):
@@ -70,6 +73,16 @@ def normalize_occasional(values, indexes):
         values[i] = current_avg
 
     return pd.Series(values, index=indexes)
+
+def remove_after_churn(dataframe):
+    df_len = len(dataframe)
+
+    for index, row in enumerate(dataframe.values):
+        has_churned = row[2]
+        if has_churned == 1:
+            return dataframe.iloc[0:index+1]
+
+    return dataframe
 
 def normalize_occasional_columns(master_table):
     avg = master_table.avg.fillna(0)
